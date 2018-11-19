@@ -3,20 +3,26 @@ import numpy as np
 import itertools
 
 def main():
-    test_sets = [{1,2,3,4}, {1,2,3}, {3,4,5,6}]
+    test_sets = [{1,2,3,4}, {1,2,3}, {3,4,5,6}, {4,5}, {2,3,4}, {2,1,5}, {1,2,3,4}]
     df = get_intersections(test_sets)
-    df.write_csv('test.tsv', sep='\t')
+    df.to_csv('test.tsv', sep='\t')
 
 def get_intersections(sets):
-    columns = ["set{}".format(i) for i in range(len(sets))]
-    intersections_df = pd.DataFrame(columns = columns)
+    # columns = ["set{}".format(i) for i in range(len(sets))]
+    intersections_df = pd.DataFrame()
+    print(intersections_df)
+    sets = np.array(sets)
+    cardinalities = np.zeros(len(sets))
 
-    for i in len(sets):
-        for set_index_combo in itertools.combinations(len(sets), i):
-            combo_size = len(set.intersection(sets[set_index_combo]))
-            row = np.ones(len(sets), dtype=np.bool)
-            row[set_index_combo] = False
-            intersections_df.append(row)
+    for i in range(2, len(sets)):
+        for set_index_combo in itertools.combinations(range(len(sets)), i):
+            print(set_index_combo)
+            combo_size = len(set.intersection(*sets[list(set_index_combo)]))
+            row = np.zeros(len(sets), dtype=np.bool)
+            print(set_index_combo)
+            row[list(set_index_combo)] = True
+            intersections_df = intersections_df.append(pd.Series(row), ignore_index=True)
+            print(pd.Series(row))
     return intersections_df
 
 if __name__ == '__main__':
