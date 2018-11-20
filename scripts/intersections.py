@@ -8,20 +8,24 @@ def main():
     df = get_intersections(test_sets)
     df.to_csv('test.tsv', sep='\t')
 
+def get_intersection(sets, n_sets):
+    intersections_df = pd.DataFrame()
+    sets = np.array(sets)
+    for set_index_combo in itertools.combinations(range(len(sets)), n_sets):
+        combo_cardinality = len(set.intersection(*sets[list(set_index_combo)]))
+        row = np.zeros(len(sets)+1)
+        row[len(row)-1] = combo_cardinality
+        row[list(set_index_combo)] = True
+        intersections_df = intersections_df.append(pd.Series(row), ignore_index = True)
+    return intersections_df
+
 def get_intersections(sets):
     # columns = ["set{}".format(i) for i in range(len(sets))]
     intersections_df = pd.DataFrame()
-    print(intersections_df)
     sets = np.array(sets)
-    cardinalities = np.zeros(len(sets))
-
     for i in range(1, len(sets)):
-        for set_index_combo in itertools.combinations(range(len(sets)), i):
-            combo_cardinality = len(set.intersection(*sets[list(set_index_combo)]))
-            row = np.zeros(len(sets)+1)
-            row[len(row)-1] = combo_cardinality
-            row[list(set_index_combo)] = True
-            intersections_df = intersections_df.append(pd.Series(row), ignore_index=True)
+        intersection_df = get_intersection(sets, i)
+        intersections_df = intersections_df.append(intersection_df, ignore_index=True)
 
     return intersections_df
 
