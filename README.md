@@ -1,7 +1,6 @@
-pog500_expression
+Expression Analysis
 ==============================
 
-Analysis of POG500 expression data, particularily with the goal of attempting to use it in predicting drug response.
 
 Project Organization
 ------------
