@@ -5,6 +5,8 @@ import pandas as pd
 import numpy as np
 import math
 import argparse
+import time
+import sys
 
 from matplotlib import pyplot as plt
 from sklearn.preprocessing import PowerTransformer
@@ -56,10 +58,13 @@ def get_masks(cancer_types, drug_names, drugs_expression_df):
 
 
 def main():
+    local_time = time.localtime()
+    output_dir_name = "{}_{}_{}".format(local_time.tm_hour, local_time.tm_min, local_time.tm_sec)
+
     parser = argparse.ArgumentParser()
     parser.add_argument('-x', '--features', help='path to features tsv. must have column called \'pog_id\'', required=True)
     parser.add_argument('-y', '--labels', help='path to labels tsv. must have columns: \'pog_id\', \'drug_name\', \'response\', \'cancer_cohort\'', required=True)
-    parser.add_argument('-o', '--out_dir', help='where to save the output files', required=True)
+    parser.add_argument('-o', '--out_dir', help='where to save the output files', default=output_dir_name)
     parser.add_argument('-m', '--model', choices=['svc'], help='select the model', required=True)
     parser.add_argument('-v', '--variance_threshold', default=0, help='before RFE, filter features based on variance. Default: do not filter')    
     parser.add_argument('-d', '--discretize', action='store_true', help='if classification, use box-cox transform and discretize response by < 0 or >= 0')
@@ -129,8 +134,10 @@ def main():
 
     # pd.DataFrame(list(scores.values()), index=list(scores.keys()), columns=['Score']).sort_values('Score').to_csv('report.tsv', sep='\t')
     pd.DataFrame(rows, columns=['cancer_type', 'drug_name', 'n', 'score']).sort_values('score').to_csv(results_path + '/report.tsv', sep='\t')
-    print('expression data path: {}'.format(expression_file_path), file=open(results_path + '/output.txt', 'w+'))
-    print('drugs data path: {}'.format(drugs_file_path), file=open(results_path + '/output.txt', 'w+')) 
+    with open(results_path + '/output.txt', 'w+') as results_file:
+        print('command line arguments (sys.argv object): {}'.format(sys.argv), file=results_file)
+        print('expression data path: {}'.format(expression_file_path), file=results_file)
+        print('drugs data path: {}'.format(drugs_file_path), file=results_file) 
 
 
 if __name__ == '__main__':
