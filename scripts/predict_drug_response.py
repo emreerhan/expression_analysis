@@ -7,6 +7,7 @@ import math
 import argparse
 import time
 import sys
+import os
 
 from matplotlib import pyplot as plt
 from sklearn.preprocessing import PowerTransformer
@@ -66,7 +67,7 @@ def main():
     parser.add_argument('-y', '--labels', help='path to labels tsv. must have columns: \'pog_id\', \'drug_name\', \'response\', \'cancer_cohort\'', required=True)
     parser.add_argument('-o', '--out_dir', help='where to save the output files', default=output_dir_name)
     parser.add_argument('-m', '--model', choices=['svc'], help='select the model', required=True)
-    parser.add_argument('-v', '--variance_threshold', default=0, help='before RFE, filter features based on variance. Default: do not filter')    
+    parser.add_argument('-v', '--variance_threshold', default=0, help='before RFE, filter features based on variance. Default: 0')    
     parser.add_argument('-d', '--discretize', action='store_true', help='if classification, use box-cox transform and discretize response by < 0 or >= 0')
     parser.add_argument('-s', '--random_seed', default=42, help='random seed')
 
@@ -77,6 +78,7 @@ def main():
     discretize = args.discretize
     variance_threshold = args.variance_threshold
     results_path = output_dir
+    os.mkdir(results_path)
 
     _random_seed_ = args.random_seed
 
