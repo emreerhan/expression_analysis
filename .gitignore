@@ -1,3 +1,6 @@
+# My gitignore stuff
+results/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -81,3 +84,4 @@ scripts/._intersections.py
 
 # Mac OS-specific storage files
 .DS_Store
+*DS_Store
