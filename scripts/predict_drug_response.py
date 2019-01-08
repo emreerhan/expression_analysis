@@ -7,7 +7,6 @@ import math
 import argparse
 import time
 import sys
-import os
 
 from matplotlib import pyplot as plt
 from sklearn.preprocessing import PowerTransformer
@@ -39,7 +38,8 @@ def RFE_model(X, y, model, test_size=0.25, num_features=1000, variance_threshold
     score = selector.score(X_test_selected, y_test)
     y_pred = selector.predict(X_test_selected)
     # print('Score: {}'.format(score))
-    return([n, score], y_pred)
+    y_pred_df = pd.DataFrame(data=y_pred, index=X_test.index, columns=['y_pred'])
+    return([n, score], y_pred_df)
 
 def get_masks(cancer_types, drug_names, drugs_expression_df):
     masks = []
@@ -56,7 +56,6 @@ def get_masks(cancer_types, drug_names, drugs_expression_df):
             masks.append((drugs_expression_df['cancer_cohort'] == cancer_type) & (drugs_expression_df['drug_name'] == drug_name))
             mask_labels.append((cancer_type, drug_name))
     return masks, mask_labels
-
 
 def main():
     local_time = time.localtime()
@@ -76,9 +75,8 @@ def main():
     drugs_file_path = args.labels
     output_dir = args.out_dir
     discretize = args.discretize
-    variance_threshold = args.variance_threshold
+    variance_threshold = float(args.variance_threshold)
     results_path = output_dir
-    os.mkdir(results_path)
 
     _random_seed_ = args.random_seed
 
@@ -129,9 +127,11 @@ def main():
             labels = pd.DataFrame({'y': y, 'y_trans': y_trans})
         else:
             new_row, y_pred = RFE_model(X, y, model)
-            labels = y
+            labels = pd.DataFrame({'y': y})
         rows.append([cancer_type, drug_name] + new_row)
-        X.join(labels).to_csv(results_path + '/{}_{}.tsv'.format(cancer_type, drug_name), sep='\t')
+        X = X.join(labels)
+        X = X.join(y_pred)
+        X.to_csv(results_path + '/{}_{}.tsv'.format(cancer_type, drug_name), sep='\t')
         # print('Analyzing cancer cohort: {} and drug name: {}'.format(cancer_type, drug_name))
 
     # pd.DataFrame(list(scores.values()), index=list(scores.keys()), columns=['Score']).sort_values('Score').to_csv('report.tsv', sep='\t')
