@@ -1,4 +1,10 @@
-.PHONY: clean data lint requirements sync_data_to_s3 sync_data_from_s3
+.PHONY: predict visualize clean lint requirements
+
+#################################################################################
+# PARAMETERS                                                                    #
+#################################################################################
+
+PREDICT_PARAMS ?= --help
 
 #################################################################################
 # GLOBALS                                                                       #
@@ -8,16 +14,17 @@ PROJECT_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 PROFILE = default
 PROJECT_NAME = pog500_expression
 PYTHON_INTERPRETER = python3
-
-ifeq (,$(shell which conda))
-HAS_CONDA=False
-else
-HAS_CONDA=True
-endif
+RESULTS_PATH := $(shell date '+%m_%d_%N')
 
 #################################################################################
 # COMMANDS                                                                      #
 #################################################################################
+
+
+
+predict: scripts/predict_drug_response.py
+	mkdir -p results/$(RESULTS_PATH)
+	$(PYTHON_INTERPRETER) $< $(PREDICT_PARAMS) -o results/$(RESULTS_PATH)
 
 ## Install Python Dependencies
 requirements: test_environment
@@ -32,6 +39,7 @@ requirements: test_environment
 clean:
 	find . -type f -name "*.py[co]" -delete
 	find . -type d -name "__pycache__" -delete
+	find results -depth -type d -exec rmdir {} \;
 
 ## Lint using flake8
 lint:
