@@ -1,4 +1,4 @@
-.PHONY: predict visualize clean lint requirements
+.PHONY: analyze predict visualize clean lint requirements
 
 #################################################################################
 # PARAMETERS                                                                    #
@@ -20,11 +20,17 @@ RESULTS_PATH := $(shell date '+%m_%d_%N')
 # COMMANDS                                                                      #
 #################################################################################
 
-
+analyze: predict visualize
 
 predict: scripts/predict_drug_response.py
 	mkdir -p results/$(RESULTS_PATH)
 	$(PYTHON_INTERPRETER) $< $(PREDICT_PARAMS) -o results/$(RESULTS_PATH)
+
+visualize: scripts/visualize_drug_response.py
+	mkdir -p results/$(RESULTS_PATH)/figures
+	for i in results/$(RESULTS_PATH)/*.tsv; do \
+		$(PYTHON_INTERPRETER) $< -i $$i -o results/$(RESULTS_PATH)/figures ; \
+	done
 
 ## Install Python Dependencies
 requirements: test_environment
@@ -66,11 +72,6 @@ endif
 ## Test python environment is setup correctly
 test_environment:
 	$(PYTHON_INTERPRETER) test_environment.py
-
-#################################################################################
-# PROJECT RULES                                                                 #
-#################################################################################
-
 
 
 #################################################################################
