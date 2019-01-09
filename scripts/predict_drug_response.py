@@ -99,6 +99,10 @@ def main():
     drugs_expression_df = drugs_selected_df.join(expression_df, on='pog_id', how='inner')
     drugs_expression_df = drugs_expression_df.drop_duplicates()
 
+    drug_dummies = pd.get_dummies(drugs_expression_df['drug_name'])
+    drugs_expression_df = drugs_expression_df.join(drug_dummies)
+    X_columns = np.append(expression_df.columns.values, drug_dummies.columns.values)
+
     cancer_types = np.unique(drugs_expression_df['cancer_cohort'])
     drug_names = np.unique(drugs_expression_df['drug_name'])
     mask, mask_labels = get_masks(cancer_types, drug_names, drugs_expression_df)
@@ -109,7 +113,7 @@ def main():
         cancer_type, drug_name = mask_label
 
         # Set features (X) and labels (y)
-        X = drugs_expression_sel_df.loc[:, expression_df.columns]
+        X = drugs_expression_sel_df.loc[:, X_columns]
         y = drugs_expression_sel_df.loc[:, 'response']
         n = len(y)
 
