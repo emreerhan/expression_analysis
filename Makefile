@@ -6,6 +6,9 @@
 
 PREDICT_PARAMS ?= --help
 
+ifndef RESULTS_DIR
+	RESULTS_DIR := $(strip $(shell date '+%m_%d_%N'))
+endif
 #################################################################################
 # GLOBALS                                                                       #
 #################################################################################
@@ -13,23 +16,25 @@ PREDICT_PARAMS ?= --help
 PROJECT_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 PROFILE = default
 PROJECT_NAME = pog500_expression
-PYTHON_INTERPRETER = python3
-RESULTS_PATH := $(shell date '+%m_%d_%N')
+PYTHON_INTERPRETER = python
 
 #################################################################################
 # COMMANDS                                                                      #
 #################################################################################
 
+## Same as 'make predict visualize'
 analyze: predict visualize
 
+## Run predict_drug_response.py with specified PREDICT_PARAMS and RESULTS_DIR
 predict: scripts/predict_drug_response.py
-	mkdir -p results/$(RESULTS_PATH)
-	$(PYTHON_INTERPRETER) $< $(PREDICT_PARAMS) -o results/$(RESULTS_PATH)
+	mkdir -p results/$(RESULTS_DIR)/data
+	$(PYTHON_INTERPRETER) $< $(PREDICT_PARAMS) -o results/$(RESULTS_DIR)
 
+## Run visualize_drug_response.py with specified RESULTS_DIR
 visualize: scripts/visualize_drug_response.py
-	mkdir -p results/$(RESULTS_PATH)/figures
-	for i in results/$(RESULTS_PATH)/*.tsv; do \
-		$(PYTHON_INTERPRETER) $< -i $$i -o results/$(RESULTS_PATH)/figures ; \
+	mkdir -p results/$(RESULTS_DIR)/figures
+	for i in results/$(RESULTS_DIR)/data/*.tsv; do \
+		$(PYTHON_INTERPRETER) $< -i $$i -o results/$(RESULTS_DIR)/figures ; \
 	done
 
 ## Install Python Dependencies
@@ -37,7 +42,7 @@ requirements: test_environment
 	$(PYTHON_INTERPRETER) -m pip install -U pip setuptools wheel
 	$(PYTHON_INTERPRETER) -m pip install -r requirements.txt
 
-## Make Dataset
+### Make Dataset
 # data: requirements
 #	$(PYTHON_INTERPRETER) src/data/make_dataset.py
 
