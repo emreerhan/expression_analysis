@@ -12,7 +12,7 @@ from matplotlib import pyplot as plt
 from sklearn.preprocessing import PowerTransformer
 from sklearn.model_selection import train_test_split
 from sklearn.feature_selection import RFE, VarianceThreshold
-from sklearn.svm import LinearSVC
+from sklearn.svm import LinearSVC, LinearSVR
 
 
 parser = argparse.ArgumentParser(description='Process some integers.')
@@ -39,7 +39,7 @@ def RFE_model(X, y, model, test_size=0.25, num_features=1000, variance_threshold
     y_pred = selector.predict(X_test_selected)
     # print('Score: {}'.format(score))
     y_pred_df = pd.DataFrame(data=y_pred, index=X_test.index, columns=['y_pred'])
-    return([n, score], y_pred_df)
+    return(n, score, X.loc[:, selected_features], y_pred_df)
 
 def get_masks(cancer_types, drug_names, drugs_expression_df):
     masks = []
@@ -65,23 +65,27 @@ def main():
     parser.add_argument('-x', '--features', help='path to features tsv. must have column called \'pog_id\'', required=True)
     parser.add_argument('-y', '--labels', help='path to labels tsv. must have columns: \'pog_id\', \'drug_name\', \'response\', \'cancer_cohort\'', required=True)
     parser.add_argument('-o', '--out_dir', help='where to save the output files', default=output_dir_name)
-    parser.add_argument('-m', '--model', choices=['svc'], help='select the model', required=True)
+    parser.add_argument('-m', '--model', choices=['svc', 'svr'], help='select the model', required=True)
     parser.add_argument('-v', '--variance_threshold', default=0, help='before RFE, filter features based on variance. Default: 0')    
-    parser.add_argument('-d', '--discretize', action='store_true', help='if classification, use box-cox transform and discretize response by < 0 or >= 0')
+    # parser.add_argument('-d', '--discretize', action='store_true', help='if classification, use box-cox transform and discretize response by < 0 or >= 0')
     parser.add_argument('-s', '--random_seed', default=42, help='random seed')
 
     args = parser.parse_args()
     expression_file_path = args.features
     drugs_file_path = args.labels
     output_dir = args.out_dir
-    discretize = args.discretize
     variance_threshold = float(args.variance_threshold)
     results_path = output_dir
 
     _random_seed_ = args.random_seed
 
     # TODO: Use args.model to select model
-    model = LinearSVC(max_iter=50000)
+    if args.model == 'svc':
+        discretize = True
+        model = LinearSVC(max_iter=50000)
+    elif args.model == 'svr':
+        discretize = False
+        model = LinearSVR(max_iter=50000)
 
     # TODO: Use test_size param
     # TODO: Determine transform on y, for now assume box-cox
@@ -115,27 +119,28 @@ def main():
         # Set features (X) and labels (y)
         X = drugs_expression_sel_df.loc[:, X_columns]
         y = drugs_expression_sel_df.loc[:, 'response']
-        n = len(y)
 
         if len(y) < 10:
-            # print('Skipping cohort {} and drug name {} with n={}'.format(cancer_type, drug_name, len(y)))
-            continue
-
+           # print('Skipping cohort {} and drug name {} with n={}'.format(cancer_type, drug_name, len(y)))
+           continue
+       
+        # Power transform y
+        power_transformer = PowerTransformer(method='box-cox', standardize=True)
+        y_trans = power_transformer.fit_transform(y.values.reshape(-1, 1))[:, 0]
+         
         if discretize:
-            # Power transform y
-            power_transformer = PowerTransformer(method='box-cox', standardize=True)
-            y_trans = power_transformer.fit_transform(y.values.reshape(-1, 1))[:, 0]
             # Discretize y
             y_discrete = y_trans > 0
-            new_row, y_pred = RFE_model(X, y_discrete, model, variance_threshold=variance_threshold)
-            labels = pd.DataFrame({'y': y, 'y_trans': y_trans})
+            n, score, X_selected, y_pred = RFE_model(X, y_discrete, model, variance_threshold=variance_threshold)
         else:
-            new_row, y_pred = RFE_model(X, y, model)
-            labels = pd.DataFrame({'y': y})
-        rows.append([cancer_type, drug_name] + new_row)
-        X = X.join(labels)
-        X = X.join(y_pred)
-        X.to_csv(results_path + '/{}_{}.tsv'.format(cancer_type, drug_name), sep='\t')
+            # regression
+            n, score, X_selected, y_pred = RFE_model(X, y_trans, model, variance_threshold=variance_threshold)
+
+        labels = pd.DataFrame({'y': y, 'y_trans': y_trans})
+        rows.append([cancer_type, drug_name, n, score])
+        X_selected = X_selected.join(labels)
+        X_selected = X_selected.join(y_pred)
+        X_selected.to_csv(results_path + '/data/{}_{}.tsv'.format(cancer_type, drug_name), sep='\t')
         # print('Analyzing cancer cohort: {} and drug name: {}'.format(cancer_type, drug_name))
 
     # pd.DataFrame(list(scores.values()), index=list(scores.keys()), columns=['Score']).sort_values('Score').to_csv('report.tsv', sep='\t')
