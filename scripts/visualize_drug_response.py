@@ -10,6 +10,25 @@ def rand_jitter(arr):
     jitter = 0.0001
     return arr + np.random.randn(len(arr)) * jitter
 
+def discrete_plot(y_trans, y_pred):
+    jitter_points = rand_jitter(np.zeros(len(y_pred)))
+    hues = y_pred.apply(lambda x: 'green' if x else 'red')
+
+    plt.figure(figsize=(40, 10))
+    plt.plot([0, 0], [-0.002, 0.002], '-')
+    plt.scatter(y_trans, jitter_points, c=hues, marker='.')
+    plt.xlabel('Power transformed days on tx')
+    plt.ylabel('(random jitter)')
+
+def regression_plot(y_trans, y_pred):
+    plt.figure(figsize=(10, 10))
+    plt.plot(y_trans, y_pred, '.')
+    point1 = min(np.append(y_trans, y_pred))
+    point2 = max(np.append(y_trans, y_pred))
+    plt.plot([point1, point2], [point1, point2], '-')
+    plt.xlabel('Power transformed days on tx')
+    plt.ylabel('Predicted power transformed days on tx')
+
 def main():
     local_time = time.localtime()
     output_dir_name = "{}_{}_{}".format(local_time.tm_hour, local_time.tm_min, local_time.tm_sec)
@@ -32,16 +51,17 @@ def main():
     test_set_mask = np.logical_not(pd.isnull(results_df['y_pred']))
     test_set_df = results_df[test_set_mask]
 
-    y = np.zeros(len(test_set_df))
-    hues = test_set_df['y_pred'].apply(lambda x: 'green' if x else 'red')
+    if len(np.unique(test_set_df['y_pred'])) > 2:
+        discrete = False
+    else:
+        discrete = True
+    
+    if discrete:
+        discrete_plot(test_set_df['y_trans'], test_set_df['y_pred'])
+    else:
+        regression_plot(test_set_df['y_trans'], test_set_df['y_pred'])
 
-    plt.figure(figsize=(40, 10))
-    plt.plot([0, 0], [-0.002, 0.002], '-')
-    plt.scatter(test_set_df['y_trans'], rand_jitter(y), c=hues, marker='.')
-    plt.xlabel('Power transformed days on tx')
-    plt.ylabel('(random jitter)')
     plt.title('Cancer type: {} vs Drug: {}'.format(cancer_type, drug_name))
-
     plt.savefig(out_dir + '/{}.png'.format(input_file_prefix))
 
 if __name__ == '__main__':
