@@ -15,17 +15,26 @@ from sklearn.feature_selection import RFE, VarianceThreshold
 from sklearn.svm import LinearSVC, LinearSVR
 
 
-parser = argparse.ArgumentParser(description='Process some integers.')
-parser.add_argument('integers', metavar='N', type=int, nargs='+',
-                    help='an integer for the accumulator')
+def get_test_mask(data, col_name='pog_id', test_p=0.25, random_state=42):
+    test_size = math.floor(test_p * len(data))
+    test_index = np.random.choice(np.unique(data[col_name]), size=test_size)
+    test_mask = data[col_name].isin(test_index)
+
+    return test_mask
 
 
-def RFE_model(X, y, model, test_size=0.25, num_features=1000, variance_threshold=0, step=0.05, verbose=0):
+def RFE_model(X, y, model, test_mask, num_features=1000, variance_threshold=0, step=0.05, verbose=0):
     # Train test split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=_test_size_, random_state=_random_seed_)
+    # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=_random_seed_)
+    X_test = X[test_mask]
+    X_train = X[~test_mask]
+    y_test = y[test_mask]
+    y_train = y[~test_mask]
+
     n = len(y)
 
     # Apply variance threshold on features
+    # TODO: note that this is probably removing dummy variables with low variance
     variance_selector = VarianceThreshold(threshold=variance_threshold)
     variance_selector.fit(X_train)
     selected_features = X_train.columns[variance_selector.get_support()]
@@ -61,6 +70,7 @@ def main():
     local_time = time.localtime()
     output_dir_name = "{}_{}_{}".format(local_time.tm_hour, local_time.tm_min, local_time.tm_sec)
 
+    #TODO: move to separate argparse function
     parser = argparse.ArgumentParser()
     parser.add_argument('-x', '--features', help='path to features tsv. must have column called \'pog_id\'', required=True)
     parser.add_argument('-y', '--labels', help='path to labels tsv. must have columns: \'pog_id\', \'drug_name\', \'response\', \'cancer_cohort\'', required=True)
@@ -120,10 +130,13 @@ def main():
         X = drugs_expression_sel_df.loc[:, X_columns]
         y = drugs_expression_sel_df.loc[:, 'response']
 
-        if len(y) < 10:
+        if len(y) < 12:
            # print('Skipping cohort {} and drug name {} with n={}'.format(cancer_type, drug_name, len(y)))
            continue
-       
+        
+        # Determine test set mask
+        test_mask = get_test_mask(drugs_expression_sel_df)
+
         # Power transform y
         power_transformer = PowerTransformer(method='box-cox', standardize=True)
         y_trans = power_transformer.fit_transform(y.values.reshape(-1, 1))[:, 0]
@@ -131,10 +144,10 @@ def main():
         if discretize:
             # Discretize y
             y_discrete = y_trans > 0
-            n, score, X_selected, y_pred = RFE_model(X, y_discrete, model, variance_threshold=variance_threshold)
+            n, score, X_selected, y_pred = RFE_model(X, y_discrete, model, test_mask, variance_threshold=variance_threshold)
         else:
-            # regression
-            n, score, X_selected, y_pred = RFE_model(X, y_trans, model, variance_threshold=variance_threshold)
+            # Regression
+            n, score, X_selected, y_pred = RFE_model(X, y_trans, model, test_mask, variance_threshold=variance_threshold)
 
         labels = pd.DataFrame({'y': y, 'y_trans': y_trans})
         rows.append([cancer_type, drug_name, n, score])
