@@ -118,9 +118,9 @@ def main():
 
     cancer_types = np.unique(drugs_expression_df['cancer_cohort'])
     drug_names = np.unique(drugs_expression_df['drug_name'])
+    drugs_expression_df = drugs_expression_df.set_index('pog_id')
     mask, mask_labels = get_combination_masks(cancer_types, drug_names, drugs_expression_df)
 
-    drugs_expression_df = drugs_expression_df.set_index('pog_id')
     report_rows = []
     for mask, mask_label in zip(mask, mask_labels):
         drugs_expression_sel_df = drugs_expression_df[mask]
