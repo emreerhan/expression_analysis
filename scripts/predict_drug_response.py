@@ -33,7 +33,10 @@ def get_combination_masks(cancer_types, drug_names, drugs_expression_df):
 
 def train_test_split(X, y, test_p=0.25, n_iter=10, random_state=42):
     y_test = []
-    while len(np.unique(y_test)) < 2 and n_iter > 1:
+    y_train = []
+    X_train = []
+    X_test = []
+    while (len(np.unique(y_test)) < 2) and (len(np.unique(y_train)) < 2) and (len(np.unique(X_test)) < 2) and (len(np.unique(X_train)) < 2) and (n_iter > 1):
         n_iter -= 1
         test_size = math.floor(test_p * len(X))
         ids = np.unique(X.index.values)
@@ -44,9 +47,8 @@ def train_test_split(X, y, test_p=0.25, n_iter=10, random_state=42):
         y_test = y[y.index.isin(test_index)]
     return X_train, X_test, y_train, y_test
 
-def feature_selection(X_train, y_train, model, test_mask, num_features=300, variance_threshold=0, step=0.05, verbose=0, n_jobs=8):
+def feature_selection(X_train, y_train, model, num_features=300, variance_threshold=0, step=0.05, verbose=0, n_jobs=8):
     # Train test split
-    n = len(y)
 
     # Apply variance threshold on features
     # TODO: note that this is probably removing dummy variables with low variance
@@ -56,15 +58,16 @@ def feature_selection(X_train, y_train, model, test_mask, num_features=300, vari
     X_train_selected = X_train.loc[:, selected_features]
 
     # Recursive feature elimination with cross validation
-    selector = RFECV(model, min_features_to_select=num_features, step=step, verbose=verbose, n_jobs=n_jobs)
+    selector = RFECV(model, min_features_to_select=num_features, step=step, verbose=verbose, n_jobs=n_jobs, cv=3)
     # TODO: figure out way to output scores of intermediate selectors
-    X_new = selector.fit_transform(X_train_selected, y_train)
-    return selector, X_new.columns
+    selector.fit(X_train_selected, y_train)
+    selected_features = X_train_selected.columns[selector.get_support()]
+    return selector, selected_features
 
 
 def test_model(X_test, y_test, model):
     y_pred = model.predict(X_test)
-    score = model.score(X_test)
+    score = model.score(X_test, y_test)
     return y_pred, score
 
 def main():
@@ -131,30 +134,34 @@ def main():
         y = drugs_expression_sel_df.loc[:, 'response']
         n = len(y)
 
-        if len(y) < 10:
+        if len(y) < 25:
            # print('Skipping cohort {} and drug name {} with n={}'.format(cancer_type, drug_name, len(y)))
            continue
 
         # Power transform y
         power_transformer = PowerTransformer(method='box-cox', standardize=True)
         y_trans = power_transformer.fit_transform(y.values.reshape(-1, 1))[:, 0]
+        y_trans = pd.Series(index=y.index, data=y_trans)
 
         # Determine test set mask
         X_train, X_test, y_train, y_test = train_test_split(X, y_trans)
 
-        if len(np.unique(y_test)) < 2:
+        if len(np.unique(y_test)) < 2 and len(np.unique(y_train)) < 2:
             print('Skipping cancer {} and drug {} due to not finding a proper split.'.format(cancer_type, drug_name))
          
         if discretize:
             # Discretize y if binary classification problem
             # TODO: In case not binary classification, implement a better discretization
-            y_discrete = y_trans > 0
+            y_train = y_train > 0
+            y_test = y_test > 0
         selector, selected_columns = feature_selection(X_train, y_train, model, variance_threshold=variance_threshold)
+        X_test_selected = X_test.loc[:, selected_columns]
 
-        y_pred, score = test_model(X_test[:, selected_columns], y_test, selector)
+        y_pred, score = test_model(X_test_selected, y_test, selector)
+        y_pred = pd.DataFrame(index=X_test_selected.index, data={'y_pred': y_pred})
         labels = pd.DataFrame({'y': y, 'y_trans': y_trans})
         report_rows.append([cancer_type, drug_name, n, score])
-        X_selected = X[:, selected_columns]
+        X_selected = X.loc[:, selected_columns]
         X_selected = X_selected.join(labels)
         X_selected = X_selected.join(y_pred)
         X_selected.to_csv(results_path + '/data/{}_{}.tsv'.format(cancer_type, drug_name), sep='\t')
