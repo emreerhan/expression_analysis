@@ -132,9 +132,9 @@ def main():
         # Set features (X) and labels (y)
         X = drugs_expression_sel_df.loc[:, X_columns]
         y = drugs_expression_sel_df.loc[:, 'response']
-        n = len(y)
+        n = len(np.unique(X.index.values))
 
-        if len(y) < 25:
+        if n < 12:
            # print('Skipping cohort {} and drug name {} with n={}'.format(cancer_type, drug_name, len(y)))
            continue
 
@@ -146,7 +146,7 @@ def main():
         # Determine test set mask
         X_train, X_test, y_train, y_test = train_test_split(X, y_trans)
 
-        if len(np.unique(y_test)) < 2 and len(np.unique(y_train)) < 2:
+        if (len(np.unique(y_test)) < 2) and (len(np.unique(y_train)) < 2) and (len(np.unique(X_test)) < 2) and (len(np.unique(X_train)) < 2):
             print('Skipping cancer {} and drug {} due to not finding a proper split.'.format(cancer_type, drug_name))
          
         if discretize:
@@ -158,6 +158,7 @@ def main():
         X_test_selected = X_test.loc[:, selected_columns]
 
         y_pred, score = test_model(X_test_selected, y_test, selector)
+        # y_pred, score = test_model(X_test, y_test, selector)
         y_pred = pd.DataFrame(index=X_test_selected.index, data={'y_pred': y_pred})
         labels = pd.DataFrame({'y': y, 'y_trans': y_trans})
         report_rows.append([cancer_type, drug_name, n, score])
