@@ -38,8 +38,8 @@ def train_test_split(X, y, test_p=0.25, n_iter=10, random_state=42):
     X_test = []
     while (len(np.unique(y_test)) < 2) and (len(np.unique(y_train)) < 2) and (len(np.unique(X_test)) < 2) and (len(np.unique(X_train)) < 2) and (n_iter > 1):
         n_iter -= 1
-        test_size = math.floor(test_p * len(X))
         ids = np.unique(X.index.values)
+        test_size = math.floor(test_p * len(ids))
         test_index = np.random.choice(ids, size=test_size)
         X_train = X[~X.index.isin(test_index)]
         X_test = X[X.index.isin(test_index)]
@@ -54,15 +54,15 @@ def feature_selection(X_train, y_train, model, num_features=300, variance_thresh
     # TODO: note that this is probably removing dummy variables with low variance
     variance_selector = VarianceThreshold(threshold=variance_threshold)
     variance_selector.fit(X_train)
-    selected_features = X_train.columns[variance_selector.get_support()]
-    X_train_selected = X_train.loc[:, selected_features]
+    var_selected_features = X_train.columns[variance_selector.get_support()]
+    X_train_selected = X_train.loc[:, var_selected_features]
 
     # Recursive feature elimination with cross validation
     selector = RFECV(model, min_features_to_select=num_features, step=step, verbose=verbose, n_jobs=n_jobs, cv=3)
     # TODO: figure out way to output scores of intermediate selectors
     selector.fit(X_train_selected, y_train)
     selected_features = X_train_selected.columns[selector.get_support()]
-    return selector, selected_features
+    return selector, selected_features, var_selected_features
 
 
 def test_model(X_test, y_test, model):
@@ -95,7 +95,8 @@ def main():
     # Use args.model to select model
     if args.model == 'svc':
         discretize = True
-        model = LinearSVC(max_iter=50000)
+        # model = LinearSVC(max_iter=50000)
+        model = LinearSVC(max_iter=10000)
     elif args.model == 'svr':
         discretize = False
         model = LinearSVR(max_iter=50000)
@@ -113,6 +114,8 @@ def main():
     # ## Join drugs and expression tables
 
     drugs_expression_df = drugs_selected_df.join(expression_df, on='pog_id', how='inner')
+    # Filter out -1s and 0s
+    drugs_expression_df = drugs_expression_df[~((drugs_expression_df['response'] == -1) | (drugs_expression_df['response'] == 0))]
     drugs_expression_df = drugs_expression_df.drop_duplicates()
 
     drug_dummies = pd.get_dummies(drugs_expression_df['drug_name'])
@@ -154,10 +157,20 @@ def main():
             # TODO: In case not binary classification, implement a better discretization
             y_train = y_train > 0
             y_test = y_test > 0
-        selector, selected_columns = feature_selection(X_train, y_train, model, variance_threshold=variance_threshold)
-        X_test_selected = X_test.loc[:, selected_columns]
-
-        y_pred, score = test_model(X_test_selected, y_test, selector)
+        selector, selected_columns, var_selected_features = feature_selection(X_train, y_train, model, variance_threshold=variance_threshold)
+        X_test_selected = X_test.loc[:, var_selected_features]
+        try:
+            y_pred, score = test_model(X_test_selected, y_test, selector)
+        except ValueError as err:
+            print(err)
+            X_test.to_csv('X_test.tsv', sep='\t')
+            y_test.to_csv('y_test.tsv', sep='\t')
+            X_train.to_csv('X_train.tsv', sep='\t')
+            y_train.to_csv('y_train.tsv', sep='\t')
+            print('{} and {}'.format(cancer_type, drug_name))
+            pd.DataFrame({'support': selector.get_support()}).to_csv('get_support.tsv', sep='\t')
+            print(selector.get_params())
+            sys.exit(1)
         # y_pred, score = test_model(X_test, y_test, selector)
         y_pred = pd.DataFrame(index=X_test_selected.index, data={'y_pred': y_pred})
         labels = pd.DataFrame({'y': y, 'y_trans': y_trans})
