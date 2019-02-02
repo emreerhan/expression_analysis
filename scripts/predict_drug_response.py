@@ -46,6 +46,7 @@ def train_test_split(X, y, test_p=0.25, random_state=42):
 
 def feature_selection(X_train, y_train, model, num_features=300, variance_threshold=0, step=0.05, verbose=0, n_jobs=8):
     n = len(X_train)
+    k = 10 if n >= 10 else n
     # Train test split
 
     # Apply variance threshold on features
@@ -56,7 +57,7 @@ def feature_selection(X_train, y_train, model, num_features=300, variance_thresh
     X_train_selected = X_train.loc[:, var_selected_features]
 
     # Recursive feature elimination with cross validation
-    selector = RFECV(model, min_features_to_select=num_features, step=step, verbose=verbose, n_jobs=n_jobs, cv=3)
+    selector = RFECV(model, min_features_to_select=num_features, step=step, verbose=verbose, n_jobs=n_jobs, cv=k)
     # TODO: figure out way to output scores of intermediate selectors
     selector.fit(X_train_selected, y_train)
     selected_features = X_train_selected.columns[selector.get_support()]
@@ -135,7 +136,7 @@ def main():
         y = drugs_expression_sel_df.loc[:, 'response']
         n = len(np.unique(X.index.values))
 
-        if n < 12:
+        if n < 5:
            # print('Skipping cohort {} and drug name {} with n={}'.format(cancer_type, drug_name, len(y)))
            continue
 
