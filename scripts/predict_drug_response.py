@@ -18,16 +18,19 @@ def get_combination_masks(cancer_types, drug_names, drugs_expression_df):
     masks = []
     mask_labels = []
     for cancer_type in cancer_types:
-        masks.append(drugs_expression_df['cancer_cohort'] == cancer_type)
-        mask_labels.append((cancer_type, 'All'))
-        drug_mask = False
         for drug_name in drug_names:
-            if not drug_mask:
+            if cancer_type == 'All' and drug_name == 'All':
+                masks.append(np.ones(len(drugs_expression_df), dtype=bool))
+                mask_labels.append(('All', 'All'))
+            elif cancer_type == 'All':
                 masks.append(drugs_expression_df['drug_name'] == drug_name)
                 mask_labels.append(('All', drug_name))
-                drug_mask = True
-            masks.append((drugs_expression_df['cancer_cohort'] == cancer_type) & (drugs_expression_df['drug_name'] == drug_name))
-            mask_labels.append((cancer_type, drug_name))
+            elif drug_name == 'All':
+                masks.append(drugs_expression_df['cancer_cohort'] == cancer_type)
+                mask_labels.append((cancer_type, 'All'))
+            else:
+                masks.append((drugs_expression_df['cancer_cohort'] == cancer_type) & (drugs_expression_df['drug_name'] == drug_name))
+                mask_labels.append((cancer_type, drug_name))
     return masks, mask_labels
 
 
@@ -110,16 +113,15 @@ def main():
 
     drugs_expression_df = drugs_selected_df.join(expression_df, on='pog_id', how='inner')
     # Filter out -1s and 0s
-    drugs_expression_df[~((drugs_expression_df['response'] == -1) | (drugs_expression_df['response'] == 0))]
+    drugs_expression_df = drugs_expression_df[drugs_expression_df['response'] > 0]
     drugs_expression_df = drugs_expression_df.drop_duplicates()
 
     drug_dummies = pd.get_dummies(drugs_expression_df['drug_name'])
     drugs_expression_df = drugs_expression_df.join(drug_dummies)
     X_columns = np.append(expression_df.columns.values, drug_dummies.columns.values)
 
-    cancer_types = np.unique(drugs_expression_df['cancer_cohort'])
-    print(cancer_types)
-    drug_names = np.unique(drugs_expression_df['drug_name'].dropna())
+    cancer_types = np.append(np.unique(drugs_expression_df['cancer_cohort']), 'All')
+    drug_names = np.append(np.unique(drugs_expression_df['drug_name'].dropna()), 'All')
     drugs_expression_df = drugs_expression_df.set_index('pog_id')
     mask, mask_labels = get_combination_masks(cancer_types, drug_names, drugs_expression_df)
 
