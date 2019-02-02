@@ -31,23 +31,18 @@ def get_combination_masks(cancer_types, drug_names, drugs_expression_df):
     return masks, mask_labels
 
 
-def train_test_split(X, y, test_p=0.25, n_iter=10, random_state=42):
-    y_test = []
-    y_train = []
-    X_train = []
-    X_test = []
-    while (len(np.unique(y_test)) < 2) and (len(np.unique(y_train)) < 2) and (len(np.unique(X_test)) < 2) and (len(np.unique(X_train)) < 2) and (n_iter > 1):
-        n_iter -= 1
-        ids = np.unique(X.index.values)
-        test_size = math.floor(test_p * len(ids))
-        test_index = np.random.choice(ids, size=test_size)
-        X_train = X[~X.index.isin(test_index)]
-        X_test = X[X.index.isin(test_index)]
-        y_train = y[~y.index.isin(test_index)]
-        y_test = y[y.index.isin(test_index)]
+def train_test_split(X, y, test_p=0.25, random_state=42):
+    ids = np.unique(X.index.values)
+    test_size = math.floor(test_p * len(ids))
+    test_index = np.random.choice(ids, size=test_size)
+    X_train = X[~X.index.isin(test_index)]
+    X_test = X[X.index.isin(test_index)]
+    y_train = y[~y.index.isin(test_index)]
+    y_test = y[y.index.isin(test_index)]
     return X_train, X_test, y_train, y_test
 
 def feature_selection(X_train, y_train, model, num_features=300, variance_threshold=0, step=0.05, verbose=0, n_jobs=8):
+    n = len(X_train)
     # Train test split
 
     # Apply variance threshold on features
@@ -96,7 +91,7 @@ def main():
     if args.model == 'svc':
         discretize = True
         # model = LinearSVC(max_iter=50000)
-        model = LinearSVC(max_iter=10000)
+        model = LinearSVC(max_iter=50000)
     elif args.model == 'svr':
         discretize = False
         model = LinearSVR(max_iter=50000)
@@ -115,7 +110,7 @@ def main():
 
     drugs_expression_df = drugs_selected_df.join(expression_df, on='pog_id', how='inner')
     # Filter out -1s and 0s
-    drugs_expression_df = drugs_expression_df[~((drugs_expression_df['response'] == -1) | (drugs_expression_df['response'] == 0))]
+    drugs_expression_df[~((drugs_expression_df['response'] == -1) | (drugs_expression_df['response'] == 0))]
     drugs_expression_df = drugs_expression_df.drop_duplicates()
 
     drug_dummies = pd.get_dummies(drugs_expression_df['drug_name'])
@@ -123,7 +118,8 @@ def main():
     X_columns = np.append(expression_df.columns.values, drug_dummies.columns.values)
 
     cancer_types = np.unique(drugs_expression_df['cancer_cohort'])
-    drug_names = np.unique(drugs_expression_df['drug_name'])
+    print(cancer_types)
+    drug_names = np.unique(drugs_expression_df['drug_name'].dropna())
     drugs_expression_df = drugs_expression_df.set_index('pog_id')
     mask, mask_labels = get_combination_masks(cancer_types, drug_names, drugs_expression_df)
 
@@ -146,17 +142,25 @@ def main():
         y_trans = power_transformer.fit_transform(y.values.reshape(-1, 1))[:, 0]
         y_trans = pd.Series(index=y.index, data=y_trans)
 
-        # Determine test set mask
-        X_train, X_test, y_train, y_test = train_test_split(X, y_trans)
+        X_train = []
+        y_train = []
+        X_test = []
+        y_test = []
+        n_iter = 10
+        while ((len(np.unique(y_test)) < 2) or (len(np.unique(y_train)) < 2) or (n_iter > 1)):
+            n_iter -= 1
+            # Determine test set mask
+            X_train, X_test, y_train, y_test = train_test_split(X, y_trans)
+            if discretize:
+                # Discretize y if binary classification problem
+                # TODO: In case not binary classification, implement a better discretization
+                y_train = y_train > 0
+                y_test = y_test > 0
 
-        if (len(np.unique(y_test)) < 2) and (len(np.unique(y_train)) < 2) and (len(np.unique(X_test)) < 2) and (len(np.unique(X_train)) < 2):
+        if((len(np.unique(y_test)) < 2) or (len(np.unique(y_train)) < 2)):
             print('Skipping cancer {} and drug {} due to not finding a proper split.'.format(cancer_type, drug_name))
-         
-        if discretize:
-            # Discretize y if binary classification problem
-            # TODO: In case not binary classification, implement a better discretization
-            y_train = y_train > 0
-            y_test = y_test > 0
+            continue
+
         selector, selected_columns, var_selected_features = feature_selection(X_train, y_train, model, variance_threshold=variance_threshold)
         X_test_selected = X_test.loc[:, var_selected_features]
         try:
