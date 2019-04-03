@@ -44,13 +44,13 @@ def train_test_split(X, y, test_p=0.25, random_state=42):
     y_test = y[y.index.isin(test_index)]
     return X_train, X_test, y_train, y_test
 
-def feature_selection(X_train, y_train, model, num_features=300, variance_threshold=0, step=0.05, verbose=0, n_jobs=8):
-    n = len(X_train)
-    k = 10 if n >= 10 else n
-    # Train test split
+def feature_selection(X_train, y_train, model, variance_threshold=0, step=0.05, verbose=0, n_jobs=10):
+    n = len(y_train)
+    k = 5
+    num_features = 150
 
     # Apply variance threshold on features
-    # TODO: note that this is probably removing dummy variables with low variance
+    # TODO: note that this is probably removing dummy variables with low variance; only matters in multi-drug case
     variance_selector = VarianceThreshold(threshold=variance_threshold)
     variance_selector.fit(X_train)
     var_selected_features = X_train.columns[variance_selector.get_support()]
@@ -90,6 +90,11 @@ def main():
     results_path = output_dir
 
     _random_seed_ = args.random_seed
+
+    with open(results_path + '/output.txt', 'w+') as results_file:
+        print('command line arguments (sys.argv object): {}'.format(sys.argv), file=results_file)
+        print('expression data path: {}'.format(expression_file_path), file=results_file)
+        print('drugs data path: {}'.format(drugs_file_path), file=results_file) 
 
     # Use args.model to select model
     if args.model == 'svc':
@@ -136,7 +141,7 @@ def main():
         y = drugs_expression_sel_df.loc[:, 'response']
         n = len(np.unique(X.index.values))
 
-        if n < 5:
+        if n < 10:
            # print('Skipping cohort {} and drug name {} with n={}'.format(cancer_type, drug_name, len(y)))
            continue
 
@@ -190,11 +195,6 @@ def main():
 
     # pd.DataFrame(list(scores.values()), index=list(scores.keys()), columns=['Score']).sort_values('Score').to_csv('report.tsv', sep='\t')
     pd.DataFrame(report_rows, columns=['cancer_type', 'drug_name', 'n', 'score']).sort_values('score').to_csv(results_path + '/report.tsv', sep='\t')
-    with open(results_path + '/output.txt', 'w+') as results_file:
-        print('command line arguments (sys.argv object): {}'.format(sys.argv), file=results_file)
-        print('expression data path: {}'.format(expression_file_path), file=results_file)
-        print('drugs data path: {}'.format(drugs_file_path), file=results_file) 
-
 
 if __name__ == '__main__':
     main()
