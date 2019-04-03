@@ -95,7 +95,7 @@ def main():
         print('command line arguments (sys.argv object): {}'.format(sys.argv), file=results_file)
         print('expression data path: {}'.format(expression_file_path), file=results_file)
         print('drugs data path: {}'.format(drugs_file_path), file=results_file) 
-
+        
     # Use args.model to select model
     if args.model == 'svc':
         discretize = True
@@ -122,9 +122,8 @@ def main():
     drugs_expression_df = drugs_expression_df[drugs_expression_df['response'] > 0]
     drugs_expression_df = drugs_expression_df.drop_duplicates()
 
-    drug_dummies = pd.get_dummies(drugs_expression_df['drug_name'])
-    drugs_expression_df = drugs_expression_df.join(drug_dummies)
-    X_columns = np.append(expression_df.columns.values, drug_dummies.columns.values)
+    drugs_expression_df = pd.get_dummies(drugs_expression_df, column=['drug_name'])
+    X_columns = np.append(expression_df.columns.values, np.unique(drugs_expression_df['drug_name']).values)
 
     cancer_types = np.append(np.unique(drugs_expression_df['cancer_cohort']), 'All')
     drug_names = np.append(np.unique(drugs_expression_df['drug_name'].dropna()), 'All')
