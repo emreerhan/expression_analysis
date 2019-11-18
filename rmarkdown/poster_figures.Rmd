@@ -1,0 +1,90 @@
+---
+title: "poster_figures"
+author: "Emre"
+date: "27/06/2019"
+output: pdf_document
+---
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+all_gem = read_tsv('data/All_GEMCITABINE.tsv')
+all_5fu = read_tsv('data/All_FLUOROURACIL.tsv')
+all_carbo = read_tsv('data/All_CARBOPLATIN.tsv')
+```
+
+```{r}
+all_gem = all_gem %>%
+  select(y_pred, y_trans) %>%
+  mutate(y_true = y_trans > 0) %>%
+  mutate(jitter = 0) %>%
+  mutate(cohort = 'Gemcitabine') %>%
+  filter(!is.na(y_pred))
+all_5fu = all_5fu %>%
+  select(y_pred, y_trans) %>%
+  mutate(y_true = y_trans > 0) %>%
+  mutate(jitter = 0) %>%
+  mutate(cohort = 'Fluorouracil') %>%
+  filter(!is.na(y_pred))
+all_carbo = all_carbo %>%
+  select(y_pred, y_trans) %>%
+  mutate(y_true = y_trans > 0) %>%
+  mutate(jitter = 0) %>%
+  mutate(cohort = 'Carboplatin') %>%
+  filter(!is.na(y_pred))
+merged_df = rbind(all_gem, all_5fu, all_carbo)
+merged_df = merged_df %>%
+  mutate(predicted = ifelse(y_pred == TRUE, ">0", "<=0"))
+```
+
+```{r}
+merged_df %>%
+  ggplot(aes(cohort, y_trans, color=predicted)) +
+  geom_jitter(size=4, width = 0.2, height = 0) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 25),
+      axis.text.y = element_text(size = 25),
+      axis.title = element_text(size=25, face="bold")) +
+  theme(panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.background = element_blank(),
+  axis.line = element_line(colour = "black", size=0.2)) +
+  geom_point(size=4) +
+  geom_hline(yintercept = 0, alpha = 0.2) +
+  ylab('Box-Cox( Days on Tx)') +
+  xlab('Drug name') +
+  labs(color='Predicted Outcome') 
+ggsave('drug_name_prediction.png', width = 14, height = 10)
+```
+
+```{r}
+BRCA_dna = data.table::fread('data/BRCA_DNAsynthesis.tsv')
+SARC_dna = data.table::frank('data/SARC_DNAsynthesis.tsv')
+```
+
+## Drug frequency info
+
+```{r}
+drugs = data.table::fread('/Users/emreerhan/expression_analysis/data/drugs_filtered.tsv')
+drugs_summ = drugs %>%
+  group_by(drug_name) %>%
+  summarise(count = n()) %>%
+  mutate(small = count < 25) %>%
+  rbind(c('Others (n=66)', sum(as.integer(.$count)), FALSE))
+drugs_summ 
+drugs_summ %>%
+  ggplot(aes(reorder(drug_name, -as.integer(count)), as.integer(count))) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 25),
+          axis.text.y = element_text(size = 25),
+          axis.title = element_text(size=60, face="bold")) +
+    theme(panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.background = element_blank(),
+      axis.line = element_line(colour = "black", size=0.2)) +
+      scale_y_log10() +
+      xlab('Drug name') +
+      ylab('Count') +
+      geom_bar(stat = 'identity', fill='#0055B7')
+ggsave('drug_name_bars.png', width = 30, height = 25)
+```
