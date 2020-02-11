@@ -1,0 +1,196 @@
+---
+
+title: "gem_svm_gene_enrichment.Rmd"
+output: pdf_document
+---
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(gprofiler2)
+```
+
+```{r}
+svm_weights = data.table::fread('../data/processed/gem_svm_weights.tsv')
+HUGO_conversion = gprofiler2::gconvert(svm_weights$gene)
+profile = gprofiler2::gost(svm_weights$gene)
+```
+
+Try this just for SVC1
+
+```{r}
+top_genes = svm_weights %>%
+  select(gene, SVC1) %>%
+  mutate(SVC1 = abs(SVC1)) %>%
+  arrange(SVC1) %>%
+  filter(SVC1 > 2.5e-3) %>%
+  select(gene)
+  
+gprofiler2::gost(top_genes$gene)
+```
+
+Try for SVC2
+
+```{r}
+top_genes = svm_weights %>%
+  select(gene, SVC2) %>%
+  mutate(SVC2 = abs(SVC2)) %>%
+  arrange(SVC2) %>%
+  filter(SVC2 > 2e-3) %>%
+  select(gene)
+  
+gprofiler2::gost(top_genes$gene)
+```
+
+Try SVC3
+
+```{r}
+top_genes = svm_weights %>%
+  select(gene, SVC3) %>%
+  mutate(SVC3 = abs(SVC3)) %>%
+  arrange(SVC3) %>%
+  filter(SVC3 > 2e-3) %>%
+  select(gene)
+  
+gprofiler2::gost(top_genes$gene)
+```
+
+Try SVR1
+
+```{r}
+top_genes = svm_weights %>%
+  select(gene, SVR1) %>%
+  mutate(SVR1 = abs(SVR1)) %>%
+  arrange(SVR1) %>%
+  filter(SVR1 > 2e-3) %>%
+  select(gene)
+
+top_genes
+  
+gprofiler2::gost(top_genes$gene)
+```
+
+SVR2
+
+```{r}
+top_genes = svm_weights %>%
+  select(gene, SVR2) %>%
+  mutate(SVR2 = abs(SVR2)) %>%
+  arrange(SVR2) %>%
+  filter(SVR2 > 2e-3) %>%
+  select(gene)
+
+dim(top_genes)
+```
+
+```{r}
+gprofiler2::gost(top_genes$gene)
+```
+
+SVR3
+
+```{r}
+top_genes = svm_weights %>%
+  select(gene, SVR3) %>%
+  mutate(SVR3 = abs(SVR3)) %>%
+  arrange(SVR3) %>%
+  filter(SVR3 > 2e-3) %>%
+  select(gene)
+
+dim(top_genes)
+```
+
+```{r}
+gprofiler2::gost(top_genes$gene)
+```
+
+## Does serine protease activity have more negative weights compared to the norm?
+
+```{r}
+svm_weights %>%
+  select(-V1, -gene) %>%
+  stack() %>%
+  ggplot(aes(x = ind, y=values)) +
+  geom_boxplot()
+```
+
+```{r}
+genes = svm_weights %>%
+  select(gene)
+
+gene_conversion = gprofiler2::gconvert(genes$gene)
+gene_conversion
+serine_genes = gene_conversion %>%
+  filter(str_detect(description, 'serine protease')) %>%
+  select(input)
+serine_weights = svm_weights %>%
+  filter(gene %in% serine_genes$input) %>%
+  select(-V1)
+stack_serine_weights = serine_weights %>%
+  stack(-gene)
+stack_serine_weights$gene = rep(serine_weights$gene, times=ncol(stack_serine_weights))
+stack_serine_weights
+stack_serine_weights %>%
+  ggplot(aes(x = ind, y = values)) +
+  geom_violin() +
+  geom_point(aes(color=gene))
+```
+
+```{r}
+gene_conversion %>%
+  filter(str_detect(description, 'serine protease'))
+```
+
+## Does interferon activity have more negative or positive weights compared to the norm?
+
+```{r}
+genes = svm_weights %>%
+  select(gene)
+
+gene_conversion = gprofiler2::gconvert(genes$gene)
+
+interferon_genes = gene_conversion %>%
+  filter(str_detect(description, 'interferon')) %>%
+  select(input)
+interferon_weights = svm_weights %>%
+  filter(gene %in% interferon_genes$input) %>%
+  select(-V1)
+stack_interferon_weights = interferon_weights %>%
+  stack(-gene)
+stack_interferon_weights$gene = rep(interferon_weights$gene, times=ncol(stack_interferon_weights))
+stack_interferon_weights
+stack_interferon_weights %>%
+  mutate(gene = as.factor(gene)) %>%
+  ggplot(aes(x = ind, y = values)) +
+  geom_violin() +
+  geom_point(aes(shape=gene, color=gene)) +
+  scale_shape_manual(values = 0:25)
+```
+
+```{r}
+gene_conversion %>%
+  filter(str_detect(description, 'interferon'))
+```
+
+
+## Check huang et al.'s SVM weights
+
+```{r}
+huang_gem_weights = data.table::fread('../data/external/huang_gem_weights.txt')
+```
+
+```{r}
+top_genes = huang_gem_weights %>%
+  filter(weight > 0.002) %>%
+  select(ENSEMBL_GENE_ID)
+
+temp = top_genes$ENSEMBL_GENE_ID %>%
+  str_split_fixed(fixed('.'), 2)
+top_genes = temp[,1]
+length(top_genes)
+```
+
+```{r}
+gprofiler2::gost(top_genes)
+
+```
