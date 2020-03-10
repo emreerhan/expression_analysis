@@ -122,8 +122,9 @@ def main():
     drugs_expression_df = drugs_expression_df[drugs_expression_df['response'] > 0]
     drugs_expression_df = drugs_expression_df.drop_duplicates()
 
-    drugs_expression_df = pd.get_dummies(drugs_expression_df, column=['drug_name'])
-    X_columns = np.append(expression_df.columns.values, np.unique(drugs_expression_df['drug_name']).values)
+    # drugs_expression_df = pd.get_dummies(drugs_expression_df, column=['drug_name'])
+    # X_columns = np.append(expression_df.columns.values, np.unique(drugs_expression_df['drug_name']).values)
+    X_columns = expression_df.columns.values
 
     cancer_types = np.append(np.unique(drugs_expression_df['cancer_cohort']), 'All')
     drug_names = np.append(np.unique(drugs_expression_df['drug_name'].dropna()), 'All')
@@ -133,6 +134,8 @@ def main():
     report_rows = []
     for mask, mask_label in zip(mask, mask_labels):
         drugs_expression_sel_df = drugs_expression_df[mask]
+        drugs_expression_sel_df = drugs_expression_sel_df.loc[:, np.append(X_columns, 'response')]
+        drugs_expression_sel_df = drugs_expression_sel_df.drop_duplicates()
         cancer_type, drug_name = mask_label
 
         # Set features (X) and labels (y)
@@ -164,11 +167,16 @@ def main():
                 y_train = y_train > 0
                 y_test = y_test > 0
 
-        if((len(np.unique(y_test)) < 2) or (len(np.unique(y_train)) < 2)):
+        if ((len(np.unique(y_test)) < 2) or (len(np.unique(y_train)) < 2)):
             print('Skipping cancer {} and drug {} due to not finding a proper split.'.format(cancer_type, drug_name))
             continue
-
-        selector, selected_columns, var_selected_features = feature_selection(X_train, y_train, model, variance_threshold=variance_threshold)
+        try:
+            selector, selected_columns, var_selected_features = feature_selection(X_train, y_train, model, variance_threshold=variance_threshold)
+        except ValueError as err:
+            print(err)
+            print('{} and {}'.format(cancer_type, drug_name))
+            pd.DataFrame({'support': selector.get_support()}).to_csv('get_support.tsv', sep='\t')
+ 
         X_test_selected = X_test.loc[:, var_selected_features]
         try:
             y_pred, score = test_model(X_test_selected, y_test, selector)
