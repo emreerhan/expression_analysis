@@ -5,7 +5,7 @@ import argparse
 import time
 import sys
 
-from sklearn.preprocessing import PowerTransformer
+from sklearn.preprocessing import PowerTransformer, 
 # from sklearn.model_selection import train_test_split
 from sklearn.feature_selection import RFECV, VarianceThreshold
 from sklearn.svm import LinearSVC, LinearSVR
@@ -33,6 +33,15 @@ def get_combination_masks(cancer_types, drug_names, drugs_expression_df):
                 mask_labels.append((cancer_type, drug_name))
     return masks, mask_labels
 
+def scale_and_transform(X_train, X_test, y_train, y_test):
+    std_scaler = StandardScaler()
+    pwr_transformer = PowerTransformer()
+    X_train = pd.DataFrame(std_scaler.fit_transform(X_train), columns=X_columns, index=X_train.index)
+    X_test = pd.DataFrame(std_scaler.transform(X_test), columns=X_columns, index=X_test.index)
+    pwr_transformer.fit(y_train.to_numpy().reshape(-1,1))
+    y_train = pd.Series(pwr_transformer.transform(y_train.to_numpy().reshape(-1,1))[:, 0], index=y_train.index)
+    y_test = pd.Series(pwr_transformer.transform(y_test.to_numpy().reshape(-1,1))[:, 0], index=y_test.index)
+    return X_train, X_test, y_train, y_test
 
 def train_test_split(X, y, test_p=0.25, random_state=42):
     ids = np.unique(X.index.values)
